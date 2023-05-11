@@ -168,6 +168,9 @@ func ChatGPTStream(c *gin.Context) {
 			}
 		},
 		func() {
+			// auth,可以这样添加一个新协程来处理自己的业务，比如检查用户的权限，避免被刷爆，然后close(authCheckChan)来处理
+		},
+		func() {
 			log.Info().Msg("healthcheck-server start")
 			defer log.Info().Msg("healthcheck-server end")
 			ticker := time.NewTicker(time.Second * 5)

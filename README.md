@@ -32,3 +32,13 @@ go语言使用openai的ChatGPT接口实践，使用流式传输，类似ChatGPT�
 - 直接执行main()函数
 - 然后打开ws_demo.html
 - 愉快的对话了，注意我使用了context上下文传递，超过4090token数量会接口抛错，具体逻辑请自行修改
+
+## grpc_stream
+配置：
+- 在grpc_stream/grpc.go 或者 grpc_stream/grpc/grpc_server.go 配置常量Token
+- 代理设置grpc_stream/grpc/grpc_server.go StreamChatCompletion方法里
+启动
+- 先启动grpc服务：grpc_stream/grpc/grpc_server.go main()
+- 再启动webscket服务端：grpc_stream/grpc.go main()
+- 然后打开ws_demo.html
+- 愉快的对话了，注意我使用了context上下文传递，超过4090token数量会接口抛错，具体逻辑请自行修改

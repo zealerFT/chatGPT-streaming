@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package protos;
 
-// https://blog.csdn.net/neve_give_up_dan/article/details/126920398
 // protoc --go_out=. --go-grpc_out=. test.proto
 // protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative test.proto
 option go_package="../protos";

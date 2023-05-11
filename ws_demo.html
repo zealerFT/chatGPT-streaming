@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ChatGPT WebSocket Example</title>
+    <meta charset="utf-8">
+</head>
+<body>
+<h1>ChatGPT WebSocket Example</h1>
+<form id="form">
+    <input type="text" id="content" placeholder="Enter your message">
+    <button type="submit">Send</button>
+    <button id="closeBtn">close</button>
+</form>
+<div id="dialogue"></div>
+<script>
+    // Create a WebSocket connection
+    var socket = new WebSocket("ws://localhost:8080/stream");
+
+    socket.onopen = function () {
+        console.log('握手成功');
+        if (socket.readyState === 1) {
+            console.log('连接状态成功');
+        }
+    };
+    const creativeInterval = setInterval(() => {
+        var message = {
+            type: "healthcheck-client"
+        };
+        socket.send(JSON.stringify(message));
+    }, 3000);
+    // 获取关闭按钮
+    var closeBtn = document.getElementById("closeBtn");
+
+    // 添加点击事件
+    closeBtn.addEventListener("click", function() {
+        // 关闭 WebSocket 连接
+        socket.close();
+        clearInterval(creativeInterval)
+    });
+
+    socket.onclose = event => {
+        if (event.code === 1000) {
+            console.log(`WebSocket connection closed cleanly, code={event.reason}`, event.code);
+            alert("服务端正常关闭ws")
+        } else {
+            console.error(`WebSocket connection closed with code={event.reason}`, event.code);
+        }
+        socket.close();
+        clearInterval(creativeInterval)
+        socket.onmessage = null
+        socket.onclose = null
+    };
+
+    // Handle received messages
+    socket.onmessage = function(event) {
+        var data = JSON.parse(event.data);
+        console.log(data)
+        if (data.type === "healthcheck-server") {
+            console.log("healthcheck-server")
+        } else if (data.type === "healthcheck-client") {
+            console.log("healthcheck-client")
+        } else if (data.type === "healthcheck") {
+            console.log("healthcheck")
+        } else {
+            if (data.error !== "") {
+                console.log(data.error)
+                alert(data.error)
+                socket.close();
+                clearInterval(creativeInterval)
+                socket.onmessage = null
+                socket.onclose = null
+            } else
+            if (data.content !== "io.EOF") {
+                var messages = document.getElementById("dialogue");
+                var span = document.createElement("span");
+                span.innerText = data.content;
+                messages.appendChild(span);
+            } else if (data.content === "io.EOF") {
+                var messages = document.getElementById("dialogue");
+                var br = document.createElement("br");
+                messages.appendChild(br);
+            }
+        }
+    };
+
+    // Handle form submit
+    document.getElementById("form").addEventListener("submit", function(event) {
+        event.preventDefault();
+
+        // 这里的chat可以把上次从ChatGPT获取的内容拼接进来，这样加可以有上下文的概念，但注意token的数量，当达到4090时，会降级，即无法联系上下文。
+        // 也可以使用后端来完成
+        var chat = {
+            content: document.getElementById("content").value,
+            role: "user"
+        };
+        var message = {
+            type: "stream_chat",
+            message: [
+                chat
+            ]
+        };
+
+        // Send the message as a string
+        socket.send(JSON.stringify(message));
+
+        // Clear the input fields
+        document.getElementById("content").value = "";
+    });
+</script>
+</body>
+</html>

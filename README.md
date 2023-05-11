@@ -4,7 +4,8 @@ go语言使用openai的ChatGPT接口实践，使用流式传输，类似ChatGPT�
 非常方便移植到你自己的项目，赶紧来看看吧！
 
 ## 演示
-
+![日志](https://github.com/zealerFT/chatGPT_streaming/blob/main/source/demo.png)
+![GIF演示](https://github.com/zealerFT/chatGPT_streaming/blob/main/source/demo.gif)
 ## 前置知识
 - http text/event-stream
 - Streaming with gRPC

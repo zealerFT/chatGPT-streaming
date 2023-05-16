@@ -1,11 +1,12 @@
 # chatGPT_streaming
-go语言使用openai的ChatGPT接口实践，使用流式传输，类似ChatGPT网页效果，并且可以让ChatGPT的服务单独部署（单独部署到非大中华区的服务器），并用grpc streaming
+golang使用openai的ChatGPT接口实践，使用流式传输，类似ChatGPT网页效果，并且可以让ChatGPT的服务单独部署（单独部署到非大中华区的服务器），并用grpc streaming
 做中间层，保证不受墙的影响。使用websocket最终通信，后端考虑多种情况，健壮可用。
 非常方便移植到你自己的项目，赶紧来看看吧！
 
 ## 演示
 ![日志](https://github.com/zealerFT/chatGPT_streaming/blob/main/source/demo.png)
 ![GIF演示](https://github.com/zealerFT/chatGPT_streaming/blob/main/source/demo.gif)
+
 ## 前置知识
 - http text/event-stream
 - Streaming with gRPC
@@ -14,7 +15,7 @@ go语言使用openai的ChatGPT接口实践，使用流式传输，类似ChatGPT�
 
 ## event_stream
 访问后端使用的是text/event-stream
-配置：
+#### 配置：
 - BaseURL默认是：https://api.openai.com/v1
 - token: 使用自己注册的openai的token，注意不要泄漏自己的token
 - 可以选择代理请求，方便本地测试，详细逻辑见具体代码
@@ -28,16 +29,16 @@ go语言使用openai的ChatGPT接口实践，使用流式传输，类似ChatGPT�
     config.HTTPClient.Transport = http.DefaultTransport
     client := goopenai.NewClientWithConfig(config)
   ```
-启动：
+#### 启动：
 - 直接执行main()函数
 - 然后打开ws_demo.html
 - 愉快的对话了，注意我使用了context上下文传递，超过4090token数量会接口抛错，具体逻辑请自行修改
 
 ## grpc_stream
-配置：
+#### 配置：
 - 在grpc_stream/grpc.go 或者 grpc_stream/grpc/grpc_server.go 配置常量Token
 - 代理设置grpc_stream/grpc/grpc_server.go StreamChatCompletion方法里
-启动
+#### 启动：
 - 先启动grpc服务：grpc_stream/grpc/grpc_server.go main()
 - 再启动webscket服务端：grpc_stream/grpc.go main()
 - 然后打开ws_demo.html

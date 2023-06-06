@@ -83,9 +83,14 @@ func ChatGPTStream(c *gin.Context) {
 	authCheckChan := make(chan struct{})
 
 	var req []goopenai.ChatCompletionMessage
+	var mutex sync.Mutex
 
 	// 发送ws消息给前端
 	sendWsMessage := func(content string, errs ...string) {
+		defer func() {
+			mutex.Unlock()
+		}()
+		mutex.Lock()
 		if content == "auth error" || content == "stream error" || len(errs) > 0 {
 			err = ws.WriteJSON(gin.H{"type": "stream_chat_ack", "content": content, "error": errs[0]})
 			if err != nil {
@@ -94,6 +99,15 @@ func ChatGPTStream(c *gin.Context) {
 			}
 			close(authCheckChan)
 			return
+		} else if content == "healthcheck-client" || content == "healthcheck" || content == "healthcheck-server" {
+			if err := ws.WriteJSON(gin.H{
+				"type": content,
+			}); err != nil {
+				log.Error().Err(err).Caller(1).Msg("failed to write healthcheck-server to websocket")
+				syncOnce.Do(func() {
+					close(clientCloseWs)
+				})
+			}
 		} else {
 			err = ws.WriteJSON(gin.H{"type": "stream_chat_ack", "content": content, "error": ""})
 			if err != nil {
@@ -179,14 +193,7 @@ func ChatGPTStream(c *gin.Context) {
 				case <-closeStream:
 					return
 				case <-ticker.C:
-					if err := ws.WriteJSON(gin.H{
-						"type": "healthcheck-server",
-					}); err != nil {
-						log.Error().Err(err).Caller(1).Msg("failed to write healthcheck-server to websocket")
-						syncOnce.Do(func() {
-							close(clientCloseWs)
-						})
-					}
+					sendWsMessage("healthcheck-server")
 				}
 			}
 		},
@@ -295,9 +302,7 @@ func ChatGPTStream(c *gin.Context) {
 						return
 					}
 					if msg.Type == "healthcheck-client" || msg.Type == "healthcheck-server" || msg.Type == "healthcheck" {
-						if err := ws.WriteJSON(msg); err != nil {
-							log.Error().Err(err).Caller(1).Msg("failed to write healthcheck to websocket")
-						}
+						sendWsMessage(msg.Type)
 						continue
 					} else if msg.Type == "stream_chat" {
 						messageWs <- &wsControl{

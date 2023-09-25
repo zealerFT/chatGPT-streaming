@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/glog"
@@ -41,6 +42,11 @@ type Request struct {
 	Message []Message `json:"message"`
 }
 
+const (
+	tokenLimit = 4000
+	GPT35Limit = 4090
+)
+
 // 自定义基础配置
 const (
 	BaseURL = "https://api.openai.com/v1"
@@ -49,6 +55,7 @@ const (
 
 func ChatGPTStream(c *gin.Context) {
 	var syncOnce sync.Once
+	var mu sync.Mutex
 	// Upgrade the HTTP connection to a WebSocket connectio
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -83,6 +90,7 @@ func ChatGPTStream(c *gin.Context) {
 	authCheckChan := make(chan struct{})
 
 	var req []goopenai.ChatCompletionMessage
+	var tokens int
 	var mutex sync.Mutex
 
 	// 发送ws消息给前端
@@ -159,6 +167,44 @@ func ChatGPTStream(c *gin.Context) {
 		}
 	}
 
+	// 处理token限制，使用对话总结的方式继续上下文关联
+	reqReflash := func(req []goopenai.ChatCompletionMessage) []goopenai.ChatCompletionMessage {
+		mu.Lock()
+		for _, v := range req {
+			tokens = tokens + utf8.RuneCountInString(v.Content)
+		}
+		mu.Unlock()
+		log.Info().Msgf("tokens length: %d", tokens)
+		if tokens >= GPT35Limit { // todo 需要更加精确
+			req = req[:1]
+		}
+		if tokens >= tokenLimit {
+			req = append(req, goopenai.ChatCompletionMessage{
+				Role:    goopenai.ChatMessageRoleUser,
+				Content: "请以用大约200字总结我们的对话，需要抓住重点",
+			})
+			completion, err := client.CreateChatCompletion(c, goopenai.ChatCompletionRequest{
+				Model:    goopenai.GPT3Dot5Turbo,
+				Messages: req,
+				Stream:   false,
+			})
+			if err != nil {
+				log.Err(err).Msg("reflash req fail!")
+				req = []goopenai.ChatCompletionMessage{}
+			} else {
+				// 刷新对话
+				log.Info().Msgf("总结对话：%v", completion.Choices[0].Message.Content)
+				req = []goopenai.ChatCompletionMessage{
+					{
+						Role:    goopenai.ChatMessageRoleUser,
+						Content: "这是我们之前对话的重点：" + completion.Choices[0].Message.Content,
+					},
+				}
+			}
+		}
+		return req
+	}
+
 	defer func(wait func()) {
 		select {
 		case <-closeStream:
@@ -207,6 +253,9 @@ func ChatGPTStream(c *gin.Context) {
 				case <-closeStream:
 					return
 				case message := <-messageWs:
+					// 上下文关联
+					req = reqReflash(req)
+					// 当前对话组装
 					for _, v := range message.Message {
 						req = append(req, goopenai.ChatCompletionMessage{
 							Role:    v.Role,
